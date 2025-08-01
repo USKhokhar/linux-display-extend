@@ -1,0 +1,104 @@
+name: 🚑 Installation Help
+description: Need help getting Linux Display Extend installed or running?
+title: "[HELP] "
+labels: ["help-wanted", "installation"]
+assignees:
+  - USKhokhar
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need help getting set up? We're here to help! Please provide as much detail as possible.
+
+  - type: dropdown
+    id: installation-method
+    attributes:
+      label: 📦 Installation Method
+      description: How did you try to install Linux Display Extend?
+      options:
+        - "Universal installer (curl command)"
+        - "Manual installation from scripts/"
+        - ".deb package"
+        - "Built from source"
+        - "Other method"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: linux-distro
+    attributes:
+      label: 🐧 Linux Distribution
+      description: Which Linux distribution are you using?
+      options:
+        - Ubuntu
+        - Debian
+        - Fedora
+        - Arch Linux
+        - Manjaro
+        - openSUSE
+        - Linux Mint
+        - Pop!_OS
+        - Elementary OS
+        - CentOS/RHEL
+        - Other (please specify below)
+    validations:
+      required: true
+
+  - type: input
+    id: distro-version
+    attributes:
+      label: 📋 Distribution Version
+      description: What version of your Linux distribution?
+      placeholder: "e.g., Ubuntu 22.04, Fedora 38"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-tried
+    attributes:
+      label: 🔧 What You've Tried
+      description: What steps have you already taken?
+      placeholder: |
+        1. Ran the installer command: bash <(curl -fsSL ...)
+        2. Got error: ...
+        3. Tried running display-extend start...
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: ❌ Error Messages
+      description: Please paste the full error output
+      placeholder: |
+        Paste the complete terminal output, including:
+        - Installation command output
+        - Any error messages
+        - Output of display-extend --help (if it works)
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-status
+    attributes:
+      label: 📊 Current Status
+      description: What's the current state of your installation?
+      placeholder: |
+        - Can you run 'display-extend --help'? (Yes/No)
+        - Did dependencies install correctly? (x11vnc, etc.)
+        - Are you getting "command not found" errors?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: basic-checks
+    attributes:
+      label: ✅ Basic Troubleshooting
+      description: Have you tried these basic steps?
+      options:
+        - label: "Restarted terminal after installation"
+        - label: "Checked that /usr/local/bin is in PATH"
+        - label: "Tried running with sudo (where appropriate)"
+        - label: "Verified internet connection during install"

@@ -1,0 +1,87 @@
+name: 💡 Feature Request
+description: Suggest a new feature or enhancement
+title: "[FEATURE] "
+labels: ["enhancement", "needs-discussion"]
+assignees:
+  - USKhokhar
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Help us understand what you'd like to see added to Linux Display Extend.
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: 💡 Feature Description
+      description: A clear and concise description of the feature you'd like to see
+      placeholder: "I would like to be able to use multiple Android devices as extended displays simultaneously..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-solution
+    attributes:
+      label: 🎯 Problem & Solution
+      description: What problem does this feature solve? How would it work?
+      placeholder: |
+        **Problem:** Currently I can only use one tablet at a time...
+        **Solution:** Allow configuring multiple tablets with different positions...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature-priority
+    attributes:
+      label: 📊 Priority
+      description: How important is this feature to you?
+      options:
+        - "🔥 High - I really need this"
+        - "📈 Medium - Would be nice to have"
+        - "💭 Low - Just an idea"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: feature-category
+    attributes:
+      label: 🏷️ Feature Category
+      description: What type of enhancement is this?
+      options:
+        - label: "Performance improvement"
+        - label: "New protocol/backend support (e.g., Moonlight, Wayland)"
+        - label: "Multi-device support"
+        - label: "Touch input enhancement"
+        - label: "Configuration/UI improvement"
+        - label: "Platform support (new Linux distro)"
+        - label: "Documentation improvement"
+        - label: "Other"
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 🔄 Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: "I tried using Moonlight/Sunshine but it requires too much setup..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 📋 Additional Context
+      description: Any other context, screenshots, or examples
+      placeholder: "Here's a mockup of how the UI could look..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: 🤝 Contribution
+      description: Would you be interested in helping implement this feature?
+      options:
+        - label: "I'd like to help implement this feature"
+        - label: "I can help with testing"
+        - label: "I can help with documentation"
