@@ -1,0 +1,126 @@
+name: 🐛 Bug Report
+description: Report a bug or issue with Linux Display Extend
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+assignees:
+  - USKhokhar
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us diagnose and fix the issue.
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: 🐛 Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: "When I run 'display-extend start', the VNC server fails to start..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: 🔄 Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Run 'display-extend start'
+        2. Connect VNC viewer to IP:5900
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: ✅ Expected Behavior
+      description: What you expected to happen
+      placeholder: "The extended display should appear and VNC should connect successfully"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: linux-distro
+    attributes:
+      label: 🐧 Linux Distribution
+      description: Which Linux distribution are you using?
+      options:
+        - Ubuntu
+        - Debian
+        - Fedora
+        - Arch Linux
+        - Manjaro
+        - openSUSE
+        - Linux Mint
+        - Pop!_OS
+        - Elementary OS
+        - CentOS/RHEL
+        - Other (please specify in additional info)
+    validations:
+      required: true
+
+  - type: input
+    id: distro-version
+    attributes:
+      label: 📋 Distribution Version
+      description: What version of your Linux distribution?
+      placeholder: "e.g., Ubuntu 22.04, Fedora 38, Arch (rolling)"
+    validations:
+      required: true
+
+  - type: input
+    id: android-device
+    attributes:
+      label: 📱 Android Device
+      description: What Android device are you using as the extended display?
+      placeholder: "e.g., Samsung Galaxy Tab S8, Xiaomi Pad 5"
+    validations:
+      required: false
+
+  - type: input
+    id: vnc-client
+    attributes:
+      label: 📺 VNC Client
+      description: Which VNC viewer app are you using on Android?
+      placeholder: "e.g., RealVNC Viewer, RVNC, VNC Viewer Plus"
+    validations:
+      required: false
+
+  - type: textarea
+    id: error-logs
+    attributes:
+      label: 📝 Error Logs
+      description: Please paste any error messages or logs
+      placeholder: |
+        Paste the output of:
+        - display-extend start (full output)
+        - Any error messages from terminal
+        - VNC client error messages
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: system-info
+    attributes:
+      label: 💻 System Information
+      description: Additional system information
+      placeholder: |
+        Please run these commands and paste the output:
+        - xrandr (to see display outputs)
+        - display-extend status
+        - hostname -I (your IP address)
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 📋 Additional Context
+      description: Any other context about the problem
+      placeholder: "Screenshots, configuration files, or anything else that might help"
+    validations:
+      required: false
