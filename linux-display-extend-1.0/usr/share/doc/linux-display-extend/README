@@ -1,0 +1,19 @@
+Linux Display Extend
+==================
+
+Use your Android display as an extended display for your Linux desktop.
+
+Features:
+- True extended desktop (not mirroring)
+- Mouse movement between displays
+- Drag windows between laptop and display
+- Configurable resolution and positioning
+- Easy setup with single command
+
+Quick Start:
+1. Install the package
+2. Run: display-extend start
+3. Install VNC Viewer on your Android display
+4. Connect to the displayed IP address
+
+For more information, run: display-extend --help

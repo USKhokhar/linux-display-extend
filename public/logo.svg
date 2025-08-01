@@ -1,0 +1,118 @@
+<svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Modern gradient for screens -->
+    <linearGradient id="screenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Subtle glow effect -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Connection line gradient -->
+    <linearGradient id="connectionLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.8" />
+      <stop offset="50%" style="stop-color:#764ba2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#667eea;stop-opacity:0.8" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main logo container -->
+  <g transform="translate(200, 100)">
+    
+    <!-- Laptop representation (minimal) -->
+    <g transform="translate(-100, -25)">
+      <!-- Laptop screen -->
+      <rect x="0" y="0" width="80" height="50" rx="4" fill="none" stroke="#2d3748" stroke-width="2"/>
+      <rect x="4" y="4" width="72" height="42" rx="2" fill="url(#screenGrad)" opacity="0.1"/>
+      
+      <!-- Linux (Tux) logo, minimal -->
+      <g transform="translate(40,25) scale(0.28)">
+        <!-- Face -->
+        <ellipse cx="0" cy="0" rx="28" ry="32" fill="#fff" stroke="#222" stroke-width="6"/>
+        <!-- Eyes -->
+        <ellipse cx="-10" cy="-8" rx="5" ry="8" fill="#fff" stroke="#222" stroke-width="2"/>
+        <ellipse cx="10" cy="-8" rx="5" ry="8" fill="#fff" stroke="#222" stroke-width="2"/>
+        <ellipse cx="-10" cy="-6" rx="2" ry="3" fill="#222"/>
+        <ellipse cx="10" cy="-6" rx="2" ry="3" fill="#222"/>
+        <!-- Beak -->
+        <ellipse cx="0" cy="5" rx="7" ry="4" fill="#f9c440" stroke="#f9c440" stroke-width="1"/>
+        <ellipse cx="0" cy="10" rx="5" ry="2.5" fill="#f9c440"/>
+      </g>
+      
+      <!-- Laptop base -->
+      <rect x="-5" y="50" width="90" height="6" rx="3" fill="#2d3748"/>
+      
+      <!-- Screen bezel effect -->
+      <rect x="0" y="0" width="80" height="50" rx="4" fill="none" stroke="url(#screenGrad)" stroke-width="1" opacity="0.6"/>
+    </g>
+    
+    <!-- Connection flow -->
+    <g>
+      <!-- Main connection line -->
+      <line x1="-20" y1="0" x2="20" y2="0" stroke="url(#connectionLine)" stroke-width="3" stroke-linecap="round" opacity="0.8">
+        <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite"/>
+      </line>
+      
+      <!-- Flow indicators -->
+      <circle cx="-10" cy="0" r="2" fill="#667eea" opacity="0.6">
+        <animate attributeName="cx" values="-10;10;-10" dur="2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;0" dur="2s" repeatCount="indefinite"/>
+      </circle>
+      
+      <!-- Directional chevron -->
+      <path d="M 15,-4 L 23,0 L 15,4" stroke="#764ba2" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+    </g>
+    
+    <!-- Tablet representation (minimal) -->
+    <g transform="translate(40, -35)">
+      <!-- Tablet frame -->
+      <rect x="0" y="0" width="50" height="70" rx="8" fill="none" stroke="#2d3748" stroke-width="2"/>
+      <rect x="3" y="8" width="44" height="54" rx="4" fill="url(#screenGrad)" opacity="0.1"/>
+      
+      <!-- Android logo, minimal -->
+      <g transform="translate(25,35) scale(0.38)">
+        <!-- Head -->
+        <rect x="-18" y="-16" width="36" height="28" rx="14" fill="#3ddc84"/>
+        <!-- Eyes -->
+        <circle cx="-8" cy="-6" r="2.5" fill="#fff"/>
+        <circle cx="8" cy="-6" r="2.5" fill="#fff"/>
+        <!-- Antennae -->
+        <rect x="-13" y="-25" width="4" height="11" rx="2" fill="#3ddc84" transform="rotate(-15 -13 -25)"/>
+        <rect x="9" y="-25" width="4" height="11" rx="2" fill="#3ddc84" transform="rotate(15 13 -25)"/>
+      </g>
+      
+      <!-- Screen bezel effect -->
+      <rect x="0" y="0" width="50" height="70" rx="8" fill="none" stroke="url(#screenGrad)" stroke-width="1" opacity="0.6"/>
+      
+      <!-- Minimal content indicator -->
+      <rect x="8" y="15" width="34" height="2" rx="1" fill="#667eea" opacity="0.4"/>
+      <rect x="8" y="22" width="20" height="2" rx="1" fill="#764ba2" opacity="0.3"/>
+      <rect x="8" y="29" width="28" height="2" rx="1" fill="#667eea" opacity="0.2"/>
+    </g>
+    
+  </g>
+  
+  <!-- Wordmark -->
+  <g transform="translate(200, 150)">
+    <text text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="300" fill="#ffffff" letter-spacing="2px">
+      LINUX
+    </text>
+    <text y="25" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="600" fill="#667eea" letter-spacing="2px">
+      EXTENDED
+    </text>
+    <text y="50" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="600" fill="#667eea" letter-spacing="2px">
+      DISPLAY
+    </text>
+  </g>
+  
+  <!-- Subtle accent line -->
+  <line x1="160" y1="150" x2="240" y2="150" stroke="url(#connectionLine)" stroke-width="1" opacity="0.3"/>
+  
+</svg>

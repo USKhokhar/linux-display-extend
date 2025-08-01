@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Display Extend
+Comment=Use Android display as extended display
+Exec=display-extend
+Icon=display
+Terminal=true
+Type=Application
+Categories=System;Utility;
+Keywords=display;display;extend;vnc;android;

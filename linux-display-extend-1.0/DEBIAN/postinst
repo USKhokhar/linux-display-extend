@@ -1,0 +1,8 @@
+#!/bin/bash
+echo "Linux Display Extend installed successfully!"
+echo ""
+echo "Quick start:"
+echo "  display-extend start    # Start extended display"
+echo "  display-extend --help   # Show all commands"
+echo ""
+echo "Don't forget to install VNC Viewer on your Android display!"

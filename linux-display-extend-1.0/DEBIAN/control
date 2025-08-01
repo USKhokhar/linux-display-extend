@@ -1,0 +1,13 @@
+Package: linux-display-extend
+Version: 1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: x11vnc, xserver-xorg-video-dummy
+Maintainer: USKhokhar <contact.uskhokhar@gmail.com>
+Homepage: https://github.com/USKhokhar/linux-display-extend
+Vcs-Git: https://github.com/USKhokhar/linux-display-extend.git
+Description: Use Android display as extended display for Linux
+ A simple tool to use your Android display as an extended display
+ for your Linux desktop, similar to Windows/Mac extended desktop functionality.
+ Supports mouse movement and window dragging between displays.
