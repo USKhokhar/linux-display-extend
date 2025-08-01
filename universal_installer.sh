@@ -6,7 +6,7 @@ set -euo pipefail
 
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="$HOME/.config/linux-display-extend"
-REPO_URL="https://github.com/yourusername/linux-display-extend"
+REPO_URL="https://github.com/USKhokhar/linux-display-extend"
 VERSION="1.0"
 
 # Colors for output
