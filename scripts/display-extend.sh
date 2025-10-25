@@ -5,8 +5,10 @@
 # Twitter: https://twitter.com/US_Khokhar
 # Portfolio: https://uskhokhar.vercel.app
 # Repository: https://github.com/USKhokhar/linux-display-extend
-# Version 1.0
 
+
+VERSION="1.1.0"
+LATEST_VERSION_URL="https://raw.githubusercontent.com/USKhokhar/linux-display-extend/main/VERSION"
 SCRIPT_DIR="/usr/share/linux-display-extend"
 CONFIG_DIR="$HOME/.config/linux-display-extend"
 CONFIG_FILE="$CONFIG_DIR/config"
@@ -18,6 +20,7 @@ mkdir -p "$CONFIG_DIR"
 DEFAULT_WIDTH="1280"
 DEFAULT_HEIGHT="720"
 DEFAULT_POSITION="right"
+DEFAULT_MAIN_MONITOR="eDP-1"
 
 # Load or create configuration
 load_config() {
@@ -29,29 +32,82 @@ load_config() {
 DISPLAY_WIDTH=$DEFAULT_WIDTH
 DISPLAY_HEIGHT=$DEFAULT_HEIGHT
 DISPLAY_POSITION=$DEFAULT_POSITION
+MAIN_MONITOR=$DEFAULT_MAIN_MONITOR
 CONF
-        DISPLAY_WIDTH=$DEFAULT_WIDTH
-        DISPLAY_HEIGHT=$DEFAULT_HEIGHT
-        DISPLAY_POSITION=$DEFAULT_POSITION
+        source "$CONFIG_FILE"
+    fi
+    
+    DISPLAY_WIDTH=${DISPLAY_WIDTH:-$DEFAULT_WIDTH}
+    DISPLAY_HEIGHT=${DISPLAY_HEIGHT:-$DEFAULT_HEIGHT}
+    DISPLAY_POSITION=${DISPLAY_POSITION:-$DEFAULT_POSITION}
+    MAIN_MONITOR=${MAIN_MONITOR:-$DEFAULT_MAIN_MONITOR}
+}
+
+check_for_updates() {
+    if ! command -v curl &> /dev/null; then
+        return
+    fi
+    
+    current_version=$VERSION
+    latest_version=$(curl -s $LATEST_VERSION_URL 2>/dev/null || echo $VERSION)
+    
+    if [ "$current_version" != "$latest_version" ]; then
+        echo " New version available: $latest_version (you have $current_version)"
+        echo "   Run 'display-extend update' to update to the latest version"
+        echo "   Changelog: https://github.com/USKhokhar/linux-display-extend/blob/main/CHANGELOG.md"
+        echo ""
     fi
 }
 
 # Show help
 show_help() {
-    echo "Linux Display Extend v1.0"
-    echo "Use your Android display as an extended display"
+    echo "Linux Display Extend v$VERSION"
+    echo "Use your Android device as a true extended display for Linux"
     echo ""
-    echo "Usage:"
-    echo "  display-extend start                 - Start extended display"
-    echo "  display-extend stop                  - Stop extended display"
-    echo "  display-extend status                - Show current status"
-    echo "  display-extend config                - Configure display settings"
-    echo "  display-extend install-vnc           - Install VNC viewer on display"
-    echo "  display-extend --help                - Show this help"
+    echo "Usage: display-extend [command]"
     echo ""
-    echo "Configuration:"
-    echo "  Edit ~/.config/linux-display-extend/config"
-    echo "  or run 'display-extend config' for interactive setup"
+    echo "Commands:"
+    echo "  start               - Start the extended display"
+    echo "  stop                - Stop the extended display"
+    echo "  restart             - Restart the extended display"
+    echo "  status              - Show current status"
+    echo "  config              - Configure display settings"
+    echo "  install-vnc         - Show VNC installation instructions"
+    echo "  update              - Update to the latest version"
+    echo "  --help, -h          - Show this help message"
+    echo "  --version, -v       - Show version information"
+    echo ""
+    echo "Configuration: $CONFIG_FILE"
+    echo "Issues: https://github.com/USKhokhar/linux-display-extend/issues"
+    echo ""
+    check_for_updates
+}
+
+update_self() {
+    echo "Updating Linux Display Extend..."
+    
+    if ! command -v curl &> /dev/null; then
+        echo "Error: curl is required to update"
+        exit 1
+    fi
+    
+    echo "Downloading the latest version..."
+    temp_file=$(mktemp)
+    if curl -sSL https://raw.githubusercontent.com/USKhokhar/linux-display-extend/main/installer/universal_installer.sh -o "$temp_file"; then
+        chmod +x "$temp_file"
+        echo "Installing update..."
+        exec "$temp_file"
+    else
+        echo "Failed to download update"
+        rm -f "$temp_file"
+        exit 1
+    fi
+}
+
+show_version() {
+    echo "Linux Display Extend v$VERSION"
+    echo "https://github.com/USKhokhar/linux-display-extend"
+    check_for_updates
 }
 
 # Interactive configuration
@@ -61,16 +117,19 @@ configure() {
     echo "Current settings:"
     echo "  Resolution: ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}"
     echo "  Position: $DISPLAY_POSITION of main display"
+    echo "  Main Monitor: $MAIN_MONITOR"
     echo ""
     
     read -p "Enter display resolution width (default: $DISPLAY_WIDTH): " width
     read -p "Enter display resolution height (default: $DISPLAY_HEIGHT): " height
     read -p "Position relative to main display [left/right/above/below] (default: $DISPLAY_POSITION): " position
+    read -p "Main Monitor (default: $MAIN_MONITOR): " main_monitor
     
     # Use defaults if empty
     width=${width:-$DISPLAY_WIDTH}
     height=${height:-$DISPLAY_HEIGHT}
     position=${position:-$DISPLAY_POSITION}
+    main_monitor=${main_monitor:-$MAIN_MONITOR}
     
     # Update config file
     cat > "$CONFIG_FILE" << CONF
@@ -78,12 +137,14 @@ configure() {
 DISPLAY_WIDTH=$width
 DISPLAY_HEIGHT=$height
 DISPLAY_POSITION=$position
+MAIN_MONITOR=$main_monitor
 CONF
     
     echo "Configuration saved to $CONFIG_FILE"
     DISPLAY_WIDTH=$width
     DISPLAY_HEIGHT=$height
     DISPLAY_POSITION=$position
+    MAIN_MONITOR=$main_monitor
 }
 
 # Get main display info
@@ -98,21 +159,29 @@ get_main_display() {
 start_extended() {
     echo "Starting Linux Display Extend (true extended mode)..."
 
+    # Load configuration
+    load_config
+
     # Get your laptop's main resolution first
-    MAIN_RES=$(xrandr | grep "eDP-1" | grep -o "[0-9]*x[0-9]*" | head -1)
+    MAIN_RES=$(xrandr | grep "$MAIN_MONITOR" | grep -o "[0-9]*x[0-9]*" | head -1)
+    if [ -z "$MAIN_RES" ]; then
+        echo "Error: Could not find resolution for monitor $MAIN_MONITOR"
+        echo "Available monitors: $(xrandr | grep " connected" | cut -d' ' -f1 | tr '\n' ' ')"
+        exit 1
+    fi
     MAIN_WIDTH=$(echo $MAIN_RES | cut -d'x' -f1)
 
     # Create virtual mode
     xrandr --newmode "1280x720_60.00"  74.50  1280 1344 1472 1664  720 723 728 748 -hsync +vsync 2>/dev/null
 
-    # Add to HDMI-1 (or first disconnected output)
+    # Add to first disconnected output
     DISCONNECTED=$(xrandr | grep disconnected | head -1 | cut -d' ' -f1)
     if [ -z "$DISCONNECTED" ]; then
         echo "Error: No disconnected output found!"
         exit 1
     fi
     xrandr --addmode $DISCONNECTED "1280x720_60.00" 2>/dev/null
-    xrandr --output $DISCONNECTED --mode "1280x720_60.00" --right-of eDP-1
+    xrandr --output $DISCONNECTED --mode "1280x720_60.00" --${DISPLAY_POSITION:-right}-of $MAIN_MONITOR
     if [ $? -ne 0 ]; then
         echo "Error: Failed to enable extended display!"
         exit 1
@@ -148,6 +217,7 @@ show_status() {
     echo "Configuration:"
     echo "  Resolution: ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}"
     echo "  Position: $DISPLAY_POSITION"
+    echo "  Main Monitor: $MAIN_MONITOR"
 }
 
 # Show VNC installation instructions
@@ -160,10 +230,17 @@ install_vnc_help() {
 # Main script logic
 case "$1" in
     start)
+        load_config
         start_extended
         ;;
     stop)
         stop_extended
+        ;;
+    restart)
+        stop_extended
+        sleep 1
+        load_config
+        start_extended
         ;;
     status)
         load_config
@@ -176,12 +253,13 @@ case "$1" in
     install-vnc)
         install_vnc_help
         ;;
-    --help|-h|help|"")
-        show_help
+    update)
+        update_self
         ;;
-    *)
-        echo "Unknown command: $1"
-        echo "Use 'display-extend --help' for usage information"
-        exit 1
+    --version|-v)
+        show_version
+        ;;
+    --help|-h|*)
+        show_help
         ;;
 esac

@@ -7,7 +7,7 @@ set -euo pipefail
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="$HOME/.config/linux-display-extend"
 REPO_URL="https://github.com/USKhokhar/linux-display-extend"
-VERSION="1.0"
+VERSION="1.1.0"
 
 # Colors for output
 RED='\033[0;31m'
@@ -175,7 +175,20 @@ UNINSTALL_EOF
     sudo chmod +x "/usr/local/bin/display-extend-uninstall"
 }
 
-# Main installation flow
+show_version() {
+    echo "Linux Display Extend Installer v$VERSION"
+    exit 0
+}
+
+show_help() {
+    echo "Linux Display Extend Installer"
+    echo "Usage: $0 [--help] [--version]"
+    echo
+    echo "This script will install Linux Display Extend and its dependencies"
+    echo "on your system. It supports most major Linux distributions."
+    exit 0
+}
+
 main() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════╗"
@@ -187,9 +200,9 @@ main() {
     echo
     
     # Check if running as root
-    if [[ $EUID -eq 0 ]]; then
-        print_error "Please don't run this installer as root"
-        print_status "Run as regular user (installer will ask for sudo when needed)"
+    if [ "$(id -u)" -eq 0 ]; then
+        echo -e "\n[${RED}ERROR${NC}] Please don't run this installer as root"
+        echo -e "[${YELLOW}INFO${NC}] Run as regular user (installer will ask for sudo when needed)"
         exit 1
     fi
     
@@ -234,17 +247,16 @@ main() {
     echo -e "${YELLOW}Star us on GitHub:${NC} $REPO_URL"
 }
 
-# Handle command line arguments
-case "${1:-}" in
-    "--help"|"-h")
-        echo "Linux Display Extend Installer"
-        echo "Usage: $0 [--help]"
-        echo
-        echo "This script will install Linux Display Extend and its dependencies"
-        echo "on your system. It supports most major Linux distributions."
-        exit 0
-        ;;
-    *)
-        main "$@"
-        ;;
-esac
+for arg in "$@"; do
+    case $arg in
+        --version|-v)
+            show_version
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+    esac
+done
+
+main "$@"
