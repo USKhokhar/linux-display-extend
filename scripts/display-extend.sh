@@ -8,6 +8,7 @@ APP_NAME="Linux Display Extend"
 APP_SLUG="linux-display-extend"
 REPO_URL="https://github.com/USKhokhar/linux-display-extend"
 CHANGELOG_URL="$REPO_URL/blob/main/CHANGELOG.md"
+DISTRO="unknown"
 
 XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
@@ -135,6 +136,20 @@ die() {
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
+}
+
+require_linux() {
+    [[ "$(uname -s)" == "Linux" ]] || die "This command is only supported on Linux"
+}
+
+detect_distro() {
+    if [[ -f /etc/os-release ]]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        DISTRO="${ID:-unknown}"
+    else
+        DISTRO="unknown"
+    fi
 }
 
 set_defaults() {
@@ -481,6 +496,8 @@ Core commands:
 
 Support commands:
   doctor                Validate dependencies and X11 readiness
+  install-deps          Install runtime dependencies for this distro
+  install-dependencies  Alias for install-deps
   logs                  Show recent runtime logs
   set-password          Set or rotate the VNC password
   install-vnc           Show Android client setup help
@@ -631,8 +648,48 @@ set_password() {
     info "Recovery copy written to $PASSWORD_HINT_FILE"
 }
 
+install_dependencies() {
+    require_linux
+    detect_distro
+    banner
+    section "Dependencies" "Installing runtime prerequisites"
+    info "Detected distribution: $DISTRO"
+    info "This command may prompt for sudo to install system packages"
+
+    case "$DISTRO" in
+        ubuntu|debian|linuxmint|pop|elementary)
+            sudo apt update
+            sudo apt install -y curl x11vnc x11-xserver-utils xserver-xorg-video-dummy
+            ;;
+        fedora)
+            sudo dnf install -y curl x11vnc xrandr xorg-x11-drv-dummy
+            ;;
+        centos|rhel|rocky|almalinux)
+            sudo yum install -y epel-release
+            sudo yum install -y curl x11vnc xrandr xorg-x11-drv-dummy
+            ;;
+        arch|manjaro|endeavouros)
+            sudo pacman -S --noconfirm curl x11vnc xorg-xrandr xf86-video-dummy
+            ;;
+        opensuse|opensuse-leap|opensuse-tumbleweed)
+            sudo zypper install -y curl x11vnc xrandr xf86-video-dummy
+            ;;
+        *)
+            warn "Unsupported distribution. Install these manually:"
+            printf '  - curl\n'
+            printf '  - x11vnc\n'
+            printf '  - xrandr / x11-xserver-utils\n'
+            printf '  - xserver dummy driver package\n'
+            return 1
+            ;;
+    esac
+
+    success "Dependency installation completed"
+    info "Run 'display-extend doctor' again to verify the environment"
+}
+
 doctor() {
-    local connected disconnected
+    local connected disconnected missing_count
 
     load_config
     banner
@@ -641,11 +698,13 @@ doctor() {
     printf 'Session type: %s\n' "${XDG_SESSION_TYPE:-unknown}"
     printf 'DISPLAY: %s\n' "${DISPLAY:-unset}"
 
+    missing_count=0
     for cmd in xrandr x11vnc cvt hostname nohup; do
         if command -v "$cmd" >/dev/null 2>&1; then
             success "Found dependency: $cmd"
         else
             warn "Missing dependency: $cmd"
+            missing_count=$((missing_count + 1))
         fi
     done
 
@@ -672,6 +731,11 @@ doctor() {
         success "VNC password file is present"
     else
         warn "VNC password file is missing; one will be generated on first secure start"
+    fi
+
+    if (( missing_count > 0 )); then
+        printf '\n'
+        info "To install the missing runtime packages, run: display-extend install-deps"
     fi
 }
 
@@ -913,6 +977,9 @@ main() {
             ;;
         doctor)
             doctor
+            ;;
+        install-deps|install-dependencies)
+            install_dependencies
             ;;
         logs)
             show_logs

@@ -4,6 +4,7 @@
 
 - rebuilt the main `display-extend` runtime around safe config parsing instead of sourcing user config as shell
 - added X11-only session checks, `doctor`, `logs`, and `set-password` commands
+- added `install-deps` so users can install missing runtime packages directly from the CLI
 - made start/stop stateful by tracking the owned PID, output, mode, and clip geometry in XDG state directories
 - fixed runtime geometry handling so configured resolution and placement drive both `xrandr` and `x11vnc`
 - changed the default VNC posture from unauthenticated LAN exposure to password-based authentication

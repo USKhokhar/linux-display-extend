@@ -34,6 +34,7 @@ Then validate your machine and launch:
 
 ```bash
 display-extend doctor
+display-extend install-deps
 display-extend start
 ```
 
@@ -69,6 +70,7 @@ Core commands:
 Support commands:
 
 - `display-extend doctor`
+- `display-extend install-deps`
 - `display-extend logs`
 - `display-extend set-password`
 - `display-extend install-vnc`
@@ -134,9 +136,10 @@ Project health files:
 If the session will not start:
 
 1. Run `display-extend doctor`.
-2. Confirm you are on X11, not Wayland.
-3. Check that `xrandr` shows a connected main monitor and at least one disconnected output.
-4. Read the runtime logs with `display-extend logs`.
+2. If dependencies are missing, run `display-extend install-deps`.
+3. Confirm you are on X11, not Wayland.
+4. Check that `xrandr` shows a connected main monitor and at least one disconnected output.
+5. Read the runtime logs with `display-extend logs`.
 
 ## License
 
