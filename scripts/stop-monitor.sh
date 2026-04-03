@@ -1,4 +1,6 @@
-#!/bin/bash
-# Wrapper for modular main script
-DIR="$(dirname "$0")"
-"$DIR/display-extend.sh" stop
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/display-extend.sh" stop "$@"

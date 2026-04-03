@@ -1,113 +1,143 @@
-# 🚀 Linux Display Extend
+# Linux Display Extend
 
 <p align="center">
   <img src="public/logo.svg" height="180" alt="Linux Display Extend logo" />
 </p>
 
-**Use your Android device as a true extended display for Linux.**
+Use your Android device as a real extended display for Linux X11 sessions.
 
 [![MIT License](https://img.shields.io/github/license/USKhokhar/linux-display-extend?color=green)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/USKhokhar/linux-display-extend?style=social)](https://github.com/USKhokhar/linux-display-extend/stargazers)
 [![Issues](https://img.shields.io/github/issues/USKhokhar/linux-display-extend?color=yellow)](https://github.com/USKhokhar/linux-display-extend/issues)
-[![Pull Requests](https://img.shields.io/github/issues-pr/USKhokhar/linux-display-extend?color=blue)](https://github.com/USKhokhar/linux-display-extend/pulls)
-[![Twitter Follow](https://img.shields.io/twitter/follow/US_Khokhar?style=social)](https://twitter.com/US_Khokhar)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
+![Display Server](https://img.shields.io/badge/display%20server-X11-informational)
 
----
+## What It Does
 
-## 🚦 Quick Start
+`linux-display-extend` combines:
+
+- `xrandr` to attach and position an extra display output
+- `x11vnc` to stream only that extended desktop region
+- an Android VNC client to render and interact with the new display
+
+It is designed for X11 sessions today. Wayland support is not implemented yet.
+
+## Quick Start
+
+Install with the canonical repo-root installer:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/USKhokhar/linux-display-extend/main/installer/universal_installer.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/USKhokhar/linux-display-extend/main/universal_installer.sh)
 ```
+
+Then validate your machine and launch:
+
 ```bash
+display-extend doctor
 display-extend start
 ```
 
-1. Install a VNC viewer (e.g. RealVNC Viewer) on your Android device.
-2. Connect to the IP and port shown in your terminal (`:5900` by default).
-3. That's it, your andorid device is now your external monitor!
+On Android:
 
-> 💡 **Tip:** Run `display-extend config` to set your preferred resolution and position.
+1. Install a VNC client such as RealVNC Viewer or MultiVNC.
+2. Connect to the host and port printed by `display-extend start`.
+3. If prompted, use the password stored in `~/.config/linux-display-extend/connection.secret`.
 
----
+## Why This Release Is Better
 
-## ✨ Features
+- the runtime now respects configured resolution and position
+- the tool tracks its own PID, output, and clip geometry instead of killing unrelated `x11vnc` processes
+- config is parsed safely instead of being executed as shell
+- VNC defaults now use password authentication instead of open `-nopw`
+- the installer and package builder now have one canonical source of truth
+- the CLI is branded and includes diagnostics, logs, and password management commands
 
-- 🖥️ **True Extended Desktop:** Move windows and cursor seamlessly between your main display and Android device
-- 🔀 **Zero Mirroring:** Android acts as a real second screen, not a copy
-- ⚡ **Universal Installer:** One command sets up everything
-- 🐧 **Distro Agnostic:** Ubuntu, Debian, Fedora, Arch, openSUSE, and more
-- 🛠️ **Easy Customization:** Interactive or config file
+## Commands
 
----
-
-## 🛠️ How It Works
-- Creates a virtual display on your Linux machine using X11 and xrandr
-- Streams the extended desktop region to your Android device over VNC
-- Connect using any VNC viewer app on Android (e.g., RealVNC Viewer)
-
----
-
-## ⚙️ Customization
-- Run `display-extend config` to set display resolution and position interactively
-- Or edit `~/.config/linux-display-extend/config` manually
-
----
-
-## 📂 Scripts & Tools
-- `scripts/start-monitor.sh`: Minimal script to enable extended display
-- `scripts/stop-monitor.sh`: Minimal script to disable extended display
-- `installer/display_extend_package.sh`: Build a .deb package for Ubuntu
-- `installer/universal_installer.sh`: Cross-distro installer
-
----
-
-## 🖥️ `display-extend` Commands
-
-All commands are run as:
 ```bash
 display-extend <command> [options]
 ```
 
-- `display-extend start` — Launch the extended display and VNC server
-- `display-extend stop` — Stop the extended display and VNC server
-- `display-extend status` — Show current status of the extended display
-- `display-extend config` — Interactive configuration for resolution/position
-- `display-extend install-vnc` — (Re)install and configure VNC dependencies
-- `display-extend help` or `display-extend --help` — Show help and usage
+Core commands:
 
----
+- `display-extend start`
+- `display-extend stop`
+- `display-extend restart`
+- `display-extend status`
+- `display-extend config`
 
-## 🩹 Troubleshooting
+Support commands:
 
-**`display-extend: command not found` after install?**
+- `display-extend doctor`
+- `display-extend logs`
+- `display-extend set-password`
+- `display-extend install-vnc`
+- `display-extend update`
+- `display-extend --help`
+- `display-extend --version`
 
-If you run the installer and get `command not found: display-extend` after installation, this usually means the installer could not prompt for your sudo password in your shell (common with one-line installs or some terminal setups).
+Useful start options:
 
-To fix instantly, run these commands manually:
+- `--resolution WxH`
+- `--position right|left|above|below`
+- `--monitor <name>`
+- `--port <port>`
+- `--bind <addr>`
+- `--quality low-bandwidth|balanced|high-quality`
+- `--insecure-lan`
+- `--debug`
+
+## Support Matrix
+
+Currently supported and expected:
+
+- Linux only
+- X11 desktop sessions
+- `xrandr`, `x11vnc`, and `cvt` available on the host
+- at least one connected monitor plus one usable disconnected output target
+
+Currently not supported:
+
+- Wayland sessions
+- multi-device streaming
+- encrypted transport without a separate tunnel or network layer
+
+## Repository Layout
+
+- `scripts/display-extend.sh`: canonical runtime source
+- `universal_installer.sh`: canonical installer
+- `display_extend_package.sh`: canonical Debian package tree builder
+- `installer/`: compatibility wrappers around the root scripts
+- `.agent/`: caveats, improvements, and agent operating rules
+- `docs/`: project documentation for architecture and testing
+
+## Development
+
+Common commands:
 
 ```bash
-sudo curl -fSL https://raw.githubusercontent.com/USKhokhar/linux-display-extend/main/scripts/display-extend.sh -o /usr/local/bin/display-extend
-sudo chmod +x /usr/local/bin/display-extend
+make test
+make package
 ```
 
-Now you should be able to run `display-extend --help` from any terminal.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor workflow, architecture guidance, and pre-PR testing instructions across Linux, macOS, and Windows setups.
 
-If you still have issues, check your PATH includes `/usr/local/bin` or try restarting your terminal.
+Project health files:
 
----
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- [SECURITY.md](SECURITY.md)
+- [SUPPORT.md](SUPPORT.md)
+- [docs/RELEASE.md](docs/RELEASE.md)
 
-## 🤝 Contributing
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. PRs and ideas are welcome!
+## Troubleshooting
 
----
+If the session will not start:
 
-## 📄 License
-[MIT](LICENSE)
-
-Made with ❤️ by [USKhokhar](https://github.com/USKhokhar) · [@US_Khokhar](https://twitter.com/US_Khokhar) · [Portfolio](https://uskhokhar.vercel.app)
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+1. Run `display-extend doctor`.
+2. Confirm you are on X11, not Wayland.
+3. Check that `xrandr` shows a connected main monitor and at least one disconnected output.
+4. Read the runtime logs with `display-extend logs`.
 
 ## License
+
 [MIT](LICENSE)

@@ -1,262 +1,316 @@
-#!/bin/bash
-# Linux Display Extend - Universal Installer
-# Works on Ubuntu, Debian, Fedora, Arch, openSUSE
+#!/usr/bin/env bash
 
 set -euo pipefail
 
-INSTALL_DIR="/usr/local/bin"
-CONFIG_DIR="$HOME/.config/linux-display-extend"
+APP_NAME="Linux Display Extend"
+APP_SLUG="linux-display-extend"
 REPO_URL="https://github.com/USKhokhar/linux-display-extend"
-VERSION="1.1.0"
+DEFAULT_REF="${DISPLAY_EXTEND_REF:-main}"
+RAW_BASE_URL="https://raw.githubusercontent.com/USKhokhar/linux-display-extend/$DEFAULT_REF"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+INSTALL_BIN_DIR="/usr/local/bin"
+INSTALL_SHARE_DIR="/usr/local/share/$APP_SLUG"
+LOCAL_BIN_DIR="$HOME/.local/bin"
+LOCAL_SHARE_DIR="$HOME/.local/share/$APP_SLUG"
+DESKTOP_DIR="$HOME/.local/share/applications"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/$APP_SLUG"
+RUNTIME_URL="$RAW_BASE_URL/scripts/display-extend.sh"
+VERSION_URL="$RAW_BASE_URL/VERSION"
 
-# Print colored output
-print_status() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+VERSION="dev"
+BIN_TARGET=""
+SYSTEM_INSTALL=0
+
+if [[ -t 1 ]]; then
+    RESET=$'\033[0m'
+    BOLD=$'\033[1m'
+    GREEN=$'\033[32m'
+    YELLOW=$'\033[33m'
+    CYAN=$'\033[36m'
+    RED=$'\033[31m'
+else
+    RESET=""
+    BOLD=""
+    GREEN=""
+    YELLOW=""
+    CYAN=""
+    RED=""
+fi
+
+paint() {
+    printf '%b%s%b\n' "$1" "$2" "$RESET"
 }
 
-print_warning() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+info() {
+    printf '%b[INFO]%b %s\n' "$GREEN" "$RESET" "$1"
 }
 
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+warn() {
+    printf '%b[WARN]%b %s\n' "$YELLOW" "$RESET" "$1"
 }
 
-# Detect Linux distribution
-detect_distro() {
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        DISTRO=$ID
-        VERSION_ID=$VERSION_ID
-    else
-        print_error "Cannot detect Linux distribution"
-        exit 1
+die() {
+    printf '%b[ERROR]%b %s\n' "$RED" "$RESET" "$1" >&2
+    exit 1
+}
+
+banner() {
+    printf '\n'
+    paint "${CYAN}${BOLD}" "=============================================="
+    paint "${CYAN}${BOLD}" "          LINUX DISPLAY EXTEND INSTALLER"
+    paint "${CYAN}" "      Secure X11 setup for Android displays"
+    paint "${CYAN}${BOLD}" "=============================================="
+}
+
+resolve_version() {
+    local script_dir repo_version
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    repo_version="$script_dir/VERSION"
+
+    if [[ -f "$repo_version" ]]; then
+        VERSION="$(tr -d '[:space:]' < "$repo_version")"
     fi
 }
 
-# Install dependencies based on distribution
+require_linux() {
+    [[ "$(uname -s)" == "Linux" ]] || die "This installer can only run on Linux"
+}
+
+detect_distro() {
+    if [[ -f /etc/os-release ]]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        DISTRO="${ID:-unknown}"
+    else
+        DISTRO="unknown"
+    fi
+}
+
 install_dependencies() {
-    print_status "Installing dependencies for $DISTRO..."
-    
-    case $DISTRO in
-        "ubuntu"|"debian"|"linuxmint"|"pop"|"elementary")
+    info "Installing runtime dependencies for $DISTRO"
+
+    case "$DISTRO" in
+        ubuntu|debian|linuxmint|pop|elementary)
             sudo apt update
-            sudo apt install -y x11vnc xserver-xorg-video-dummy curl
+            sudo apt install -y curl x11vnc x11-xserver-utils xserver-xorg-video-dummy
             ;;
-        "fedora")
-            sudo dnf install -y x11vnc xorg-x11-drv-dummy curl
+        fedora)
+            sudo dnf install -y curl x11vnc xrandr xorg-x11-drv-dummy
             ;;
-        "centos"|"rhel"|"rocky"|"almalinux")
+        centos|rhel|rocky|almalinux)
             sudo yum install -y epel-release
-            sudo yum install -y x11vnc xorg-x11-drv-dummy curl
+            sudo yum install -y curl x11vnc xrandr xorg-x11-drv-dummy
             ;;
-        "arch"|"manjaro"|"endeavouros")
-            sudo pacman -S --noconfirm x11vnc xf86-video-dummy curl
+        arch|manjaro|endeavouros)
+            sudo pacman -S --noconfirm curl x11vnc xorg-xrandr xf86-video-dummy
             ;;
-        "opensuse"|"opensuse-leap"|"opensuse-tumbleweed")
-            sudo zypper install -y x11vnc xf86-video-dummy curl
+        opensuse|opensuse-leap|opensuse-tumbleweed)
+            sudo zypper install -y curl x11vnc xrandr xf86-video-dummy
             ;;
         *)
-            print_warning "Unsupported distribution: $DISTRO"
-            print_status "Please install these packages manually:"
-            echo "  - x11vnc"
-            echo "  - xserver video dummy driver"
-            read -p "Continue anyway? (y/N): " -n 1 -r
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                exit 1
-            fi
+            warn "Unsupported distribution. Install these manually before running the tool:"
+            printf '  - curl\n'
+            printf '  - x11vnc\n'
+            printf '  - xrandr / x11-xserver-utils\n'
+            printf '  - xserver dummy driver package\n'
             ;;
     esac
 }
 
-# Download and install main script
-install_tablet_extend() {
-    print_status "Installing Linux Display Extend..."
-    local BIN_PATH="/usr/local/bin/display-extend"
-    local LOCAL_BIN="$HOME/.local/bin/display-extend"
-    local INSTALLED_PATH=""
+is_local_checkout() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    [[ -f "$script_dir/scripts/display-extend.sh" && -f "$script_dir/VERSION" ]]
+}
 
-    # Try installing to /usr/local/bin first
-    if sudo curl -fsSL https://raw.githubusercontent.com/USKhokhar/linux-display-extend/main/scripts/display-extend.sh -o "$BIN_PATH" && sudo chmod +x "$BIN_PATH"; then
-        INSTALLED_PATH="$BIN_PATH"
-    else
-        print_warning "/usr/local/bin not writable, trying ~/.local/bin"
-        mkdir -p "$HOME/.local/bin"
-        if curl -fsSL https://raw.githubusercontent.com/USKhokhar/linux-display-extend/main/scripts/display-extend.sh -o "$LOCAL_BIN" && chmod +x "$LOCAL_BIN"; then
-            INSTALLED_PATH="$LOCAL_BIN"
-            # Add ~/.local/bin to PATH if not present
-            if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
-                echo 'export PATH="$PATH:$HOME/.local/bin"' >> "$HOME/.profile"
-                print_status "Added ~/.local/bin to PATH in ~/.profile. Restart your terminal or run 'source ~/.profile' to update."
-            fi
-        else
-            print_error "Failed to install display-extend to /usr/local/bin or ~/.local/bin. Please check permissions."
-            echo
-            echo "If you see 'command not found: display-extend' after install, manually run these commands:"
-            echo "  sudo curl -fSL https://raw.githubusercontent.com/USKhokhar/linux-display-extend/main/scripts/display-extend.sh -o /usr/local/bin/display-extend"
-            echo "  sudo chmod +x /usr/local/bin/display-extend"
-            echo "Then try: display-extend --help"
-            exit 1
-        fi
-    fi
+download_runtime() {
+    local target_script="$1"
+    local target_version="$2"
 
-    # Create config directory
-    mkdir -p "$CONFIG_DIR"
-    # Create default config
-    if [[ ! -f "$CONFIG_DIR/config" ]]; then
-        cat > "$CONFIG_DIR/config" << 'CONFIG_EOF'
-# Linux Display Extend Configuration
-DISPLAY_WIDTH=1280
-DISPLAY_HEIGHT=720
-DISPLAY_POSITION=right
-CONFIG_EOF
-    fi
+    command -v curl >/dev/null 2>&1 || die "curl is required for remote installation"
+    curl -fsSL "$RUNTIME_URL" -o "$target_script"
+    curl -fsSL "$VERSION_URL" -o "$target_version"
+}
 
-    # Check if installed binary is on PATH
-    if ! command -v display-extend >/dev/null 2>&1; then
-        print_warning "'display-extend' is not currently on your PATH. You may need to restart your terminal or run:"
-        print_warning "  export PATH=\"\$PATH:$HOME/.local/bin\""
-        print_warning "Or run directly: $INSTALLED_PATH"
+install_runtime_files() {
+    local source_script="$1"
+    local source_version="$2"
+
+    sudo install -d "$INSTALL_BIN_DIR" "$INSTALL_SHARE_DIR"
+    sudo install -m 755 "$source_script" "$INSTALL_BIN_DIR/display-extend"
+    sudo install -m 644 "$source_version" "$INSTALL_SHARE_DIR/VERSION"
+    BIN_TARGET="$INSTALL_BIN_DIR/display-extend"
+    SYSTEM_INSTALL=1
+}
+
+install_runtime_files_local() {
+    local source_script="$1"
+    local source_version="$2"
+
+    mkdir -p "$LOCAL_BIN_DIR" "$LOCAL_SHARE_DIR"
+    install -m 755 "$source_script" "$LOCAL_BIN_DIR/display-extend"
+    install -m 644 "$source_version" "$LOCAL_SHARE_DIR/VERSION"
+    BIN_TARGET="$LOCAL_BIN_DIR/display-extend"
+
+    if [[ ":$PATH:" != *":$LOCAL_BIN_DIR:"* ]]; then
+        printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.profile"
+        warn "Added $LOCAL_BIN_DIR to ~/.profile. Restart your shell or run: source ~/.profile"
     fi
 }
 
-# Create desktop entry
+install_runtime() {
+    local source_script source_version temp_dir script_dir
+
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    if is_local_checkout; then
+        info "Installing from local checkout"
+        source_script="$script_dir/scripts/display-extend.sh"
+        source_version="$script_dir/VERSION"
+    else
+        info "Installing from remote source at ref '$DEFAULT_REF'"
+        temp_dir="$(mktemp -d)"
+        source_script="$temp_dir/display-extend.sh"
+        source_version="$temp_dir/VERSION"
+        download_runtime "$source_script" "$source_version"
+        trap 'rm -rf "$temp_dir"' EXIT
+    fi
+
+    if sudo -v >/dev/null 2>&1; then
+        install_runtime_files "$source_script" "$source_version"
+    else
+        warn "Falling back to a user-local install under ~/.local because sudo is unavailable."
+        install_runtime_files_local "$source_script" "$source_version"
+    fi
+}
+
+create_default_config() {
+    mkdir -p "$CONFIG_DIR"
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        cat > "$CONFIG_DIR/config" <<'EOF'
+# Linux Display Extend configuration
+DISPLAY_WIDTH=1280
+DISPLAY_HEIGHT=720
+DISPLAY_POSITION=right
+MAIN_MONITOR=auto
+VNC_PORT=5900
+BIND_ADDRESS=0.0.0.0
+SECURITY_MODE=password
+QUALITY_PROFILE=balanced
+EOF
+    fi
+}
+
 create_desktop_entry() {
-    DESKTOP_DIR="$HOME/.local/share/applications"
     mkdir -p "$DESKTOP_DIR"
-    
-    cat > "$DESKTOP_DIR/display-extend.desktop" << 'DESKTOP_EOF'
+    cat > "$DESKTOP_DIR/display-extend.desktop" <<EOF
 [Desktop Entry]
-Name=Display Extend
-Comment=Use Android display as extended display
-Exec=display-extend
+Name=Linux Display Extend
+Comment=Use an Android device as an extended display on X11
+Exec=$BIN_TARGET
 Icon=display
 Terminal=true
 Type=Application
 Categories=System;Utility;
-Keywords=display;extend;vnc;android;
-DESKTOP_EOF
-    
-    print_status "Desktop entry created"
+Keywords=display;extend;android;vnc;x11;
+EOF
 }
 
-# Create uninstaller
 create_uninstaller() {
-    sudo tee "/usr/local/bin/display-extend-uninstall" > /dev/null << 'UNINSTALL_EOF'
-#!/bin/bash
-echo "Uninstalling Linux Display Extend..."
+    local target="$INSTALL_BIN_DIR/display-extend-uninstall"
+    sudo tee "$target" >/dev/null <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Stop any running instances
-display-extend stop 2>/dev/null || true
-
-# Remove files
+display-extend stop >/dev/null 2>&1 || true
 sudo rm -f /usr/local/bin/display-extend
 sudo rm -f /usr/local/bin/display-extend-uninstall
+sudo rm -rf /usr/local/share/linux-display-extend
 rm -f "$HOME/.local/share/applications/display-extend.desktop"
 
-# Ask about config
-read -p "Remove configuration files? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+printf 'Remove configuration files in ~/.config/linux-display-extend? [y/N]: '
+read -r reply
+if [[ "$reply" =~ ^[Yy]$ ]]; then
     rm -rf "$HOME/.config/linux-display-extend"
-    echo "Configuration removed"
 fi
 
-echo "Linux Display Extend uninstalled successfully!"
-UNINSTALL_EOF
+printf 'Linux Display Extend removed.\n'
+EOF
 
-    sudo chmod +x "/usr/local/bin/display-extend-uninstall"
-}
-
-show_version() {
-    echo "Linux Display Extend Installer v$VERSION"
-    exit 0
+    sudo chmod +x "$target"
 }
 
 show_help() {
-    echo "Linux Display Extend Installer"
-    echo "Usage: $0 [--help] [--version]"
-    echo
-    echo "This script will install Linux Display Extend and its dependencies"
-    echo "on your system. It supports most major Linux distributions."
-    exit 0
+    cat <<EOF
+$APP_NAME installer
+
+Usage:
+  $0 [--help] [--version] [--skip-deps]
+
+Options:
+  --skip-deps   Skip distro package installation
+  --help        Show this help
+  --version     Show installer version
+
+This installer is intended for Linux hosts only.
+The runtime itself currently supports X11 sessions only.
+EOF
 }
 
 main() {
-    echo -e "${BLUE}"
-    echo "╔══════════════════════════════════════════════╗"
-    echo "║        Linux Display Extend Installer        ║"
-    echo "║                                              ║"
-    echo "║  Use your Android tablet as extended display ║"
-    echo "╚══════════════════════════════════════════════╝"
-    echo -e "${NC}"
-    echo
-    
-    # Check if running as root
-    if [ "$(id -u)" -eq 0 ]; then
-        echo -e "\n[${RED}ERROR${NC}] Please don't run this installer as root"
-        echo -e "[${YELLOW}INFO${NC}] Run as regular user (installer will ask for sudo when needed)"
-        exit 1
-    fi
-    
-    # Check for sudo access
-    print_status "Checking sudo access..."
-    if ! sudo -n true 2>/dev/null; then
-        print_status "This installer requires sudo access for installing dependencies"
-        sudo true
-    fi
-    
+    local skip_deps=0
+
+    resolve_version
+    banner
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            --version|-v)
+                printf '%s installer v%s\n' "$APP_NAME" "$VERSION"
+                exit 0
+                ;;
+            --skip-deps)
+                skip_deps=1
+                shift
+                ;;
+            *)
+                die "Unknown option: $1"
+                ;;
+        esac
+    done
+
+    require_linux
     detect_distro
-    print_status "Detected distribution: $DISTRO"
-    
-    # Install dependencies
-    install_dependencies
-    
-    # Install main application
-    install_tablet_extend
-    
-    # Create desktop entry
+
+    if [[ "$(id -u)" -eq 0 ]]; then
+        die "Run the installer as a regular user. It will request sudo only when needed."
+    fi
+
+    if [[ "$skip_deps" == "0" ]]; then
+        install_dependencies
+    fi
+
+    install_runtime
+    create_default_config
     create_desktop_entry
-    
-    # Create uninstaller
-    create_uninstaller
-    
-    print_status "Installation completed successfully!"
-    echo
-    echo -e "${GREEN}Quick Start:${NC}"
-    echo "  1. Run: ${BLUE}display-extend start${NC}"
-    echo "  2. Install VNC Viewer on your Android tablet"
-    echo "  3. Connect to the IP address shown"
-    echo
-    echo -e "${GREEN}Available commands:${NC}"
-    echo "  ${BLUE}display-extend start${NC}       - Start extended display"
-    echo "  ${BLUE}display-extend stop${NC}        - Stop extended display"
-    echo "  ${BLUE}display-extend config${NC}      - Configure settings"
-    echo "  ${BLUE}display-extend status${NC}      - Show current status"
-    echo "  ${BLUE}display-extend --help${NC}      - Show all commands"
-    echo
-    echo -e "${GREEN}To uninstall:${NC} ${BLUE}display-extend-uninstall${NC}"
-    echo
-    echo -e "${YELLOW}Star us on GitHub:${NC} $REPO_URL"
+
+    if [[ "$SYSTEM_INSTALL" == "1" ]]; then
+        create_uninstaller
+    else
+        warn "Skipped uninstaller creation for the user-local install"
+    fi
+
+    section="Quick start"
+    printf '\n%b[%s]%b %s\n' "$BOLD$CYAN" "$section" "$RESET" "The tool is installed."
+    printf '  1. Run: %s start\n' "$BIN_TARGET"
+    printf '  2. Run: %s doctor\n' "$BIN_TARGET"
+    printf '  3. Start your Android VNC client and connect using the printed host/port\n'
+    printf '\nRepository: %s\n' "$REPO_URL"
 }
 
-for arg in "$@"; do
-    case $arg in
-        --version|-v)
-            show_version
-            ;;
-        --help|-h)
-            show_help
-            exit 0
-            ;;
-    esac
-done
-
+CONFIG_FILE="$CONFIG_DIR/config"
 main "$@"
