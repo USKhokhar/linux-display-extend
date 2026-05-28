@@ -183,12 +183,16 @@ get_output_geometry() {
 
 mode_exists_in_cache() { grep -q "^\s*${1}\b" <<< "$_XRANDR_CACHE"; }
 
+_XRANDR_LAST_ERR=""
 run_xrandr() {
     local desc="$1"; shift
     local err_file="$STATE_DIR/.xrandr-err"
     debug "xrandr: $desc -> xrandr $*"
+    _XRANDR_LAST_ERR=""
     if ! xrandr "$@" 2>"$err_file"; then
+        _XRANDR_LAST_ERR="$(cat "$err_file" 2>/dev/null)"
         rm -f "$err_file"
+        debug "xrandr failed: $_XRANDR_LAST_ERR"
         return 1
     fi
     rm -f "$err_file"
@@ -669,10 +673,20 @@ start_extended() {
         debug "Mode already exists, skipping --newmode"
     else
         # shellcheck disable=SC2086
-        run_xrandr "newmode" --newmode ${modeline_raw} || die "Failed to create xrandr mode '$mode_name'."
+        if ! run_xrandr "newmode" --newmode ${modeline_raw}; then
+            if [[ "$_XRANDR_LAST_ERR" == *"already exists"* ]]; then
+                debug "Mode '$mode_name' already exists (not in cache, but xrandr knows it)"
+            else
+                die "Failed to create xrandr mode '$mode_name': ${_XRANDR_LAST_ERR:-unknown error}
+Run 'xrandr --query' to inspect available modes."
+            fi
+        fi
     fi
 
-    run_xrandr "addmode" --addmode "$disconnected_output" "$mode_name" || debug "addmode non-zero; may already be added"
+    if ! run_xrandr "addmode" --addmode "$disconnected_output" "$mode_name"; then
+        [[ "$_XRANDR_LAST_ERR" == *"already"* ]] && debug "addmode: already added" \
+            || die "Failed to add mode '$mode_name' to '$disconnected_output': ${_XRANDR_LAST_ERR:-unknown error}"
+    fi
 
     case "$DISPLAY_POSITION" in
         right) clip_x=$((GEOM_X + GEOM_W)); clip_y=$GEOM_Y;                xrandr_side="--right-of" ;;
@@ -687,7 +701,8 @@ start_extended() {
     connection_ip="$(resolve_connection_ip)"
 
     run_xrandr "activate" --output "$disconnected_output" --mode "$mode_name" "$xrandr_side" "$MAIN_MONITOR" \
-        || die "Failed to activate '$disconnected_output' with mode '$mode_name'. Run 'xrandr --query' to inspect."
+        || die "Failed to activate '$disconnected_output' with mode '$mode_name': ${_XRANDR_LAST_ERR:-unknown error}
+Run 'xrandr --query' to inspect available outputs and modes."
 
     # Re-read actual geometry (xrandr may shift outputs to avoid negatives)
     refresh_xrandr_cache
