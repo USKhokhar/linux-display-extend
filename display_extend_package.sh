@@ -32,6 +32,7 @@ Description: Use an Android device as an extended display for Linux X11
 EOF
 
 install -m 755 "$SCRIPT_DIR/scripts/display-extend.sh" "$PACKAGE_ROOT/usr/bin/display-extend"
+install -m 644 "$SCRIPT_DIR/scripts/lib.sh" "$PACKAGE_ROOT/usr/local/share/$APP_NAME/lib.sh"
 install -m 644 "$SCRIPT_DIR/VERSION" "$PACKAGE_ROOT/usr/local/share/$APP_NAME/VERSION"
 install -m 644 "$SCRIPT_DIR/README.md" "$PACKAGE_ROOT/usr/share/doc/$APP_NAME/README.md"
 install -m 644 "$SCRIPT_DIR/CHANGELOG.md" "$PACKAGE_ROOT/usr/share/doc/$APP_NAME/CHANGELOG.md"

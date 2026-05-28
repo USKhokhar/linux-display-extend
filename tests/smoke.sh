@@ -28,8 +28,8 @@ bash -n "$ROOT_DIR/install.sh"
 
 test -f "$ROOT_DIR/build/package/linux-display-extend-$(tr -d '[:space:]' < "$ROOT_DIR/VERSION")/DEBIAN/control"
 test -f "$ROOT_DIR/CODE_OF_CONDUCT.md"
-test -f "$ROOT_DIR/SECURITY.md"
-test -f "$ROOT_DIR/SUPPORT.md"
+test -f "$ROOT_DIR/docs/SECURITY.md"
+test -f "$ROOT_DIR/docs/SUPPORT.md"
 test -f "$ROOT_DIR/.github/pull_request_template.md"
 
 printf 'Smoke checks passed.\n'
