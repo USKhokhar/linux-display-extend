@@ -45,9 +45,8 @@ QUALITY_PROFILE="balanced"
 VERSION="dev"
 DEBUG="${DISPLAY_EXTEND_DEBUG:-0}"
 STARTED_PID=""
-STARTED_OUTPUT=""
-STARTED_MODE=""
 STARTED_CLIP=""
+STARTED_ORIGINAL_FB=""
 START_SUCCESS=0
 _XRANDR_CACHE=""
 
@@ -181,21 +180,13 @@ get_output_geometry() {
         }' <<< "$_XRANDR_CACHE"
 }
 
-mode_exists_in_cache() { grep -q "^\s*${1}\b" <<< "$_XRANDR_CACHE"; }
-
-_XRANDR_LAST_ERR=""
-run_xrandr() {
-    local desc="$1"; shift
-    local err_file="$STATE_DIR/.xrandr-err"
-    debug "xrandr: $desc -> xrandr $*"
-    _XRANDR_LAST_ERR=""
-    if ! xrandr "$@" 2>"$err_file"; then
-        _XRANDR_LAST_ERR="$(cat "$err_file" 2>/dev/null)"
-        rm -f "$err_file"
-        debug "xrandr failed: $_XRANDR_LAST_ERR"
-        return 1
-    fi
-    rm -f "$err_file"
+# Get the current framebuffer (screen) size
+get_screen_size() {
+    awk '/^Screen 0:/ {
+        for (i=1; i<=NF; i++) {
+            if ($i == "current") { gsub(/,/,"",$(i+1)); print $(i+1) "x" $(i+3); exit }
+        }
+    }' <<< "$_XRANDR_CACHE"
 }
 
 # --- Monitor selection ---
@@ -233,28 +224,6 @@ split_geometry() {
     GEOM_X="${rest%%+*}"; GEOM_Y="${rest#*+}"
 }
 
-find_target_output() {
-    local output connected_list
-    output="$(list_disconnected_outputs | head -n 1)"
-    [[ -n "$output" ]] && { printf '%s' "$output"; return 0; }
-
-    connected_list="$(list_connected_outputs | tr '\n' ', ' | sed 's/,$//')"
-    die "No disconnected output is available for extending the desktop.
-
-Your connected outputs: ${connected_list:-none detected}
-
-This tool needs a disconnected xrandr output to attach a virtual display to.
-When every output is already connected (e.g., laptop screen + external monitor),
-there is no spare output to use.
-
-How to fix this:
-  1. If you have a dummy video driver installed (xserver-xorg-video-dummy),
-     it may provide a VIRTUAL output. Check with: xrandr --query
-  2. If no VIRTUAL output appears, try loading the dummy driver or check
-     your Xorg configuration for additional outputs.
-  3. Run 'display-extend doctor' for a full environment check."
-}
-
 # --- Session guards ---
 
 ensure_x11_session() {
@@ -266,7 +235,7 @@ ensure_x11_session() {
 
 ensure_runtime_requirements() {
     ensure_x11_session
-    for cmd in xrandr x11vnc cvt hostname nohup; do require_command "$cmd"; done
+    for cmd in xrandr x11vnc hostname nohup; do require_command "$cmd"; done
 }
 
 # --- Password ---
@@ -291,7 +260,7 @@ ensure_password_file() {
 # --- Runtime state and locking ---
 
 load_runtime_state() {
-    RUNTIME_PID="" RUNTIME_OUTPUT="" RUNTIME_MODE="" RUNTIME_CLIP=""
+    RUNTIME_PID="" RUNTIME_CLIP="" RUNTIME_ORIGINAL_FB=""
     RUNTIME_MAIN="" RUNTIME_BIND="" RUNTIME_PORT=""
     [[ -f "$RUNTIME_FILE" ]] || return 0
 
@@ -301,8 +270,8 @@ load_runtime_state() {
         [[ -z "$line" || "$line" != *=* ]] && continue
         key="${line%%=*}"; value="${line#*=}"
         case "$key" in
-            PID) RUNTIME_PID="$value" ;; OUTPUT) RUNTIME_OUTPUT="$value" ;;
-            MODE_NAME) RUNTIME_MODE="$value" ;; CLIP_GEOMETRY) RUNTIME_CLIP="$value" ;;
+            PID) RUNTIME_PID="$value" ;; CLIP_GEOMETRY) RUNTIME_CLIP="$value" ;;
+            ORIGINAL_FB) RUNTIME_ORIGINAL_FB="$value" ;;
             MAIN_MONITOR) RUNTIME_MAIN="$value" ;; BIND_ADDRESS) RUNTIME_BIND="$value" ;;
             VNC_PORT) RUNTIME_PORT="$value" ;;
         esac
@@ -312,12 +281,11 @@ load_runtime_state() {
 write_runtime_state() {
     cat > "$RUNTIME_FILE" <<EOF
 PID=$1
-OUTPUT=$2
-MODE_NAME=$3
-CLIP_GEOMETRY=$4
-MAIN_MONITOR=$5
-BIND_ADDRESS=$6
-VNC_PORT=$7
+CLIP_GEOMETRY=$2
+ORIGINAL_FB=$3
+MAIN_MONITOR=$4
+BIND_ADDRESS=$5
+VNC_PORT=$6
 EOF
 }
 
@@ -352,7 +320,8 @@ remove_lock() { rm -rf "$LOCK_DIR"; }
 cleanup_failed_start() {
     [[ "$START_SUCCESS" == "1" ]] && return 0
     [[ -n "$STARTED_PID" ]] && kill -0 "$STARTED_PID" >/dev/null 2>&1 && kill "$STARTED_PID" >/dev/null 2>&1 || true
-    [[ -n "$STARTED_OUTPUT" ]] && xrandr --output "$STARTED_OUTPUT" --off >/dev/null 2>&1 || true
+    # Restore original framebuffer size
+    [[ -n "$STARTED_ORIGINAL_FB" ]] && xrandr --fb "$STARTED_ORIGINAL_FB" >/dev/null 2>&1 || true
     remove_lock
 }
 
@@ -392,7 +361,6 @@ Core commands:
 Support commands:
   doctor                Validate dependencies and X11 readiness
   install-deps          Install runtime dependencies for this distro
-  install-dependencies  Alias for install-deps
   logs                  Show recent runtime logs
   set-password          Set or rotate the VNC password
   install-vnc           Show Android client setup help
@@ -523,7 +491,7 @@ doctor() {
     printf 'Session type: %s\n' "${XDG_SESSION_TYPE:-unknown}"
     printf 'DISPLAY: %s\n' "${DISPLAY:-unset}"
 
-    for cmd in xrandr x11vnc cvt hostname nohup; do
+    for cmd in xrandr x11vnc hostname nohup; do
         if command -v "$cmd" >/dev/null 2>&1; then
             success "Found dependency: $cmd"
         else
@@ -545,13 +513,7 @@ doctor() {
         printf 'Connected outputs: %s\n' "${connected:-none}"
         printf 'Disconnected outputs: %s\n' "${disconnected:-none}"
 
-        if [[ -z "$(list_disconnected_outputs)" ]]; then
-            warn "No disconnected outputs found. 'display-extend start' needs a spare output."
-            printf '  Install xserver-xorg-video-dummy if you need a VIRTUAL output.\n'
-            issue_count=$((issue_count + 1))
-        else
-            success "Disconnected output available for display extension"
-        fi
+        success "Display outputs detected"
 
         if [[ "$MAIN_MONITOR" != "auto" && -n "$MAIN_MONITOR" ]]; then
             if ! list_connected_outputs | grep -Fxq "$MAIN_MONITOR"; then
@@ -599,8 +561,8 @@ show_status() {
 
     if is_runtime_alive; then
         success "Session is running"
-        printf 'PID: %s\nOutput: %s\nMain monitor: %s\nClip geometry: %s\nBind: %s:%s\n' \
-            "$RUNTIME_PID" "$RUNTIME_OUTPUT" "$RUNTIME_MAIN" "$RUNTIME_CLIP" "$RUNTIME_BIND" "$RUNTIME_PORT"
+        printf 'PID: %s\nMain monitor: %s\nClip region: %s\nBind: %s:%s\n' \
+            "$RUNTIME_PID" "$RUNTIME_MAIN" "$RUNTIME_CLIP" "$RUNTIME_BIND" "$RUNTIME_PORT"
     else
         warn "Session is not running"
     fi
@@ -642,7 +604,7 @@ EOF
 # --- Core: start / stop / restart ---
 
 start_extended() {
-    local geometry disconnected_output modeline_raw mode_name connection_ip clip_x clip_y xrandr_side
+    local geometry connection_ip clip_x clip_y fb_w fb_h
     local listen_args pass_args quality_args
 
     load_config; parse_start_options "$@"; validate_loaded_config
@@ -658,63 +620,56 @@ start_extended() {
     geometry="$(get_output_geometry "$MAIN_MONITOR")"
     [[ -n "$geometry" ]] || die "Could not read geometry for main monitor '$MAIN_MONITOR'"
     split_geometry "$geometry"
-    debug "Main geometry: ${GEOM_W}x${GEOM_H}+${GEOM_X}+${GEOM_Y}"
+    debug "Main: ${GEOM_W}x${GEOM_H}+${GEOM_X}+${GEOM_Y}"
 
-    disconnected_output="$(find_target_output)"
-    STARTED_OUTPUT="$disconnected_output"
+    # Save original framebuffer size for restore on stop
+    STARTED_ORIGINAL_FB="$(get_screen_size)"
+    debug "Original framebuffer: $STARTED_ORIGINAL_FB"
 
-    modeline_raw="$(cvt "$DISPLAY_WIDTH" "$DISPLAY_HEIGHT" 60 | awk -F'Modeline ' '/Modeline / { print $2 }')"
-    [[ -n "$modeline_raw" ]] || die "Failed to generate modeline for ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}"
-    mode_name="$(awk '{print $1}' <<< "$modeline_raw" | tr -d '"')"
-    debug "Mode: $mode_name"
-    STARTED_MODE="$mode_name"
-
-    if mode_exists_in_cache "$mode_name"; then
-        debug "Mode already exists, skipping --newmode"
-    else
-        # shellcheck disable=SC2086
-        if ! run_xrandr "newmode" --newmode ${modeline_raw}; then
-            if [[ "$_XRANDR_LAST_ERR" == *"already exists"* ]]; then
-                debug "Mode '$mode_name' already exists (not in cache, but xrandr knows it)"
-            else
-                die "Failed to create xrandr mode '$mode_name': ${_XRANDR_LAST_ERR:-unknown error}
-Run 'xrandr --query' to inspect available modes."
-            fi
-        fi
-    fi
-
-    if ! run_xrandr "addmode" --addmode "$disconnected_output" "$mode_name"; then
-        [[ "$_XRANDR_LAST_ERR" == *"already"* ]] && debug "addmode: already added" \
-            || die "Failed to add mode '$mode_name' to '$disconnected_output': ${_XRANDR_LAST_ERR:-unknown error}"
-    fi
-
+    # Calculate where the extended display goes and the total framebuffer size
     case "$DISPLAY_POSITION" in
-        right) clip_x=$((GEOM_X + GEOM_W)); clip_y=$GEOM_Y;                xrandr_side="--right-of" ;;
-        left)  clip_x=$((GEOM_X - DISPLAY_WIDTH)); clip_y=$GEOM_Y;          xrandr_side="--left-of" ;;
-        above) clip_x=$GEOM_X; clip_y=$((GEOM_Y - DISPLAY_HEIGHT));         xrandr_side="--above" ;;
-        below) clip_x=$GEOM_X; clip_y=$((GEOM_Y + GEOM_H));                xrandr_side="--below" ;;
+        right)
+            clip_x=$((GEOM_X + GEOM_W)); clip_y=$GEOM_Y
+            fb_w=$((clip_x + DISPLAY_WIDTH)); fb_h=$((GEOM_Y + GEOM_H))
+            (( fb_h < clip_y + DISPLAY_HEIGHT )) && fb_h=$((clip_y + DISPLAY_HEIGHT))
+            ;;
+        left)
+            clip_x=0; clip_y=$GEOM_Y
+            fb_w=$((DISPLAY_WIDTH + GEOM_X + GEOM_W)); fb_h=$((GEOM_Y + GEOM_H))
+            (( fb_h < clip_y + DISPLAY_HEIGHT )) && fb_h=$((clip_y + DISPLAY_HEIGHT))
+            # Shift main monitor right to make room
+            xrandr --output "$MAIN_MONITOR" --pos "${DISPLAY_WIDTH}x${GEOM_Y}" 2>/dev/null || true
+            ;;
+        below)
+            clip_x=$GEOM_X; clip_y=$((GEOM_Y + GEOM_H))
+            fb_w=$((GEOM_X + GEOM_W)); fb_h=$((clip_y + DISPLAY_HEIGHT))
+            (( fb_w < clip_x + DISPLAY_WIDTH )) && fb_w=$((clip_x + DISPLAY_WIDTH))
+            ;;
+        above)
+            clip_x=$GEOM_X; clip_y=0
+            fb_w=$((GEOM_X + GEOM_W)); fb_h=$((DISPLAY_HEIGHT + GEOM_Y + GEOM_H))
+            (( fb_w < clip_x + DISPLAY_WIDTH )) && fb_w=$((clip_x + DISPLAY_WIDTH))
+            # Shift main monitor down to make room
+            xrandr --output "$MAIN_MONITOR" --pos "${GEOM_X}x${DISPLAY_HEIGHT}" 2>/dev/null || true
+            ;;
     esac
 
-    (( clip_x < 0 || clip_y < 0 )) && debug "Negative clip offset (${clip_x},${clip_y}); will re-read after layout"
-
     STARTED_CLIP="${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}+${clip_x}+${clip_y}"
+    debug "Extended region: $STARTED_CLIP"
+    debug "New framebuffer: ${fb_w}x${fb_h}"
+
+    # Extend the framebuffer to include the virtual region
+    if ! xrandr --fb "${fb_w}x${fb_h}" 2>/dev/null; then
+        die "Failed to resize framebuffer to ${fb_w}x${fb_h}.
+Your GPU may not support a framebuffer this large."
+    fi
+
     connection_ip="$(resolve_connection_ip)"
 
-    run_xrandr "activate" --output "$disconnected_output" --mode "$mode_name" "$xrandr_side" "$MAIN_MONITOR" \
-        || die "Failed to activate '$disconnected_output' with mode '$mode_name': ${_XRANDR_LAST_ERR:-unknown error}
-Run 'xrandr --query' to inspect available outputs and modes."
-
-    # Re-read actual geometry (xrandr may shift outputs to avoid negatives)
-    refresh_xrandr_cache
-    local actual_geom
-    actual_geom="$(get_output_geometry "$disconnected_output")"
-    [[ -n "$actual_geom" ]] && { STARTED_CLIP="$actual_geom"; debug "Actual geometry: $actual_geom"; }
-
     section "Start" "Launching display session"
-    info "Main monitor: $MAIN_MONITOR"
-    info "Target output: $disconnected_output"
-    info "Layout: ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT} $DISPLAY_POSITION of $MAIN_MONITOR"
-    info "Clip geometry: $STARTED_CLIP"
+    info "Main monitor: $MAIN_MONITOR (${GEOM_W}x${GEOM_H})"
+    info "Extended display: ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT} $DISPLAY_POSITION"
+    info "Clip region: $STARTED_CLIP"
 
     listen_args=(-rfbport "$VNC_PORT" -listen "$BIND_ADDRESS")
     mapfile -t quality_args < <(quality_flags)
@@ -726,7 +681,7 @@ Run 'xrandr --query' to inspect available outputs and modes."
         pass_args=(-nopw)
     fi
 
-    log_event "START" "Launching x11vnc on $disconnected_output clip=$STARTED_CLIP port=$VNC_PORT"
+    log_event "START" "Launching x11vnc clip=$STARTED_CLIP port=$VNC_PORT fb=${fb_w}x${fb_h}"
 
     nohup x11vnc -display "${DISPLAY:-:0}" -clip "$STARTED_CLIP" \
         -forever -shared -cursor most -cursorpos -xwarppointer -arrow 6 \
@@ -756,9 +711,9 @@ Run 'xrandr --query' to inspect available outputs and modes."
     done
     kill -0 "$STARTED_PID" >/dev/null 2>&1 || die "x11vnc exited during startup. Check $LOG_FILE"
 
-    write_runtime_state "$STARTED_PID" "$disconnected_output" "$mode_name" "$STARTED_CLIP" "$MAIN_MONITOR" "$BIND_ADDRESS" "$VNC_PORT"
+    write_runtime_state "$STARTED_PID" "$STARTED_CLIP" "$STARTED_ORIGINAL_FB" "$MAIN_MONITOR" "$BIND_ADDRESS" "$VNC_PORT"
     START_SUCCESS=1; trap - EXIT; remove_lock
-    log_event "START" "Session live pid=$STARTED_PID output=$disconnected_output"
+    log_event "START" "Session live pid=$STARTED_PID"
 
     banner; section "Live" "Extended display is ready"
     printf 'Connect from Android to: %s:%s\n' "$connection_ip" "$VNC_PORT"
@@ -769,26 +724,25 @@ Run 'xrandr --query' to inspect available outputs and modes."
 
 stop_extended() {
     load_runtime_state
-    [[ -z "${RUNTIME_PID:-}" && -z "${RUNTIME_OUTPUT:-}" ]] && { warn "No owned runtime state was found"; return 0; }
+    [[ -z "${RUNTIME_PID:-}" ]] && { warn "No owned runtime state was found"; return 0; }
 
     section "Stop" "Tearing down the owned session"
 
-    if [[ -n "${RUNTIME_PID:-}" ]] && kill -0 "$RUNTIME_PID" >/dev/null 2>&1; then
+    if kill -0 "$RUNTIME_PID" >/dev/null 2>&1; then
         kill "$RUNTIME_PID" >/dev/null 2>&1 || true
-        success "Stopped VNC server process $RUNTIME_PID"
+        success "Stopped VNC server (PID $RUNTIME_PID)"
         log_event "STOP" "Killed VNC process $RUNTIME_PID"
     else
         warn "Tracked VNC process is not running"
     fi
 
-    [[ -n "${RUNTIME_OUTPUT:-}" ]] && { xrandr --output "$RUNTIME_OUTPUT" --off >/dev/null 2>&1 || true; success "Disabled output $RUNTIME_OUTPUT"; }
-
-    # Clean up xrandr mode to prevent stale accumulation
-    if [[ -n "${RUNTIME_MODE:-}" && -n "${RUNTIME_OUTPUT:-}" ]]; then
-        xrandr --delmode "$RUNTIME_OUTPUT" "$RUNTIME_MODE" >/dev/null 2>&1 || true
-        xrandr --rmmode "$RUNTIME_MODE" >/dev/null 2>&1 || true
-        debug "Removed mode '$RUNTIME_MODE' from '$RUNTIME_OUTPUT'"
-        log_event "STOP" "Cleaned up xrandr mode $RUNTIME_MODE"
+    # Restore the original framebuffer size
+    if [[ -n "${RUNTIME_ORIGINAL_FB:-}" ]]; then
+        # If main monitor was repositioned (left/above), reset it
+        xrandr --output "$RUNTIME_MAIN" --pos 0x0 2>/dev/null || true
+        xrandr --fb "$RUNTIME_ORIGINAL_FB" 2>/dev/null || true
+        success "Restored framebuffer to $RUNTIME_ORIGINAL_FB"
+        log_event "STOP" "Restored framebuffer to $RUNTIME_ORIGINAL_FB"
     fi
 
     rm -f "$RUNTIME_FILE"; remove_lock
