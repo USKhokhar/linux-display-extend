@@ -9,3 +9,7 @@ __pycache__/
 *.pyc
 *.pyo
 build/
+.local/
+.claude/
+.agents/
+skills-lock.json

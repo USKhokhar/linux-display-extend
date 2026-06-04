@@ -98,6 +98,8 @@ Currently supported and expected:
 - `xrandr`, `x11vnc`, and `cvt` available on the host
 - at least one connected monitor plus one usable disconnected output target
 
+See [DISTROS.md](DISTROS.md) for the current Linux distribution support matrix.
+
 Currently not supported:
 
 - Wayland sessions
@@ -109,9 +111,9 @@ Currently not supported:
 - `scripts/display-extend.sh`: canonical runtime source
 - `universal_installer.sh`: canonical installer
 - `display_extend_package.sh`: canonical Debian package tree builder
+- `DISTROS.md`: Linux distribution support matrix
 - `installer/`: compatibility wrappers around the root scripts
-- `.agent/`: caveats, improvements, and agent operating rules
-- `docs/`: project documentation for architecture and testing
+- `docs/`: architecture, testing, and security documentation
 
 ## Development
 

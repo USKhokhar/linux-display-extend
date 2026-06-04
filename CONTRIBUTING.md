@@ -20,13 +20,11 @@ Contributors should optimize for:
 
 Before making changes, read:
 
-- `.agent/AGENT.md`
-- `.agent/CAVEATS.md`
-- `.agent/IMPROVEMENTS.md`
+- `DISTROS.md`
 - `docs/ARCHITECTURE.md`
 - `docs/TESTING.md`
+- `docs/SECURITY.md`
 - `CODE_OF_CONDUCT.md`
-- `SECURITY.md`
 
 ## Support Model
 
@@ -43,6 +41,8 @@ This project does not currently support:
 - broad distro claims without validation
 
 Do not widen the project promise in code or docs unless the implementation and testing truly support it.
+
+Use `DISTROS.md` as the current conservative distro support matrix, and update it only when installer logic and validation evidence support the change.
 
 ## Architecture Foundation
 

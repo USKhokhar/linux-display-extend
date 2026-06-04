@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  shell:
+  lint-and-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,5 +17,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y shellcheck shfmt
 
-      - name: Run CI checks
+      - name: Run lint and unit/smoke tests
         run: make ci
+
+      - name: Test installer fallback (without lib.sh)
+        run: bash tests/installer-fallback.sh
+
+  integration:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb x11vnc x11-xserver-utils xserver-xorg-video-dummy
+
+      - name: Run integration tests
+        run: make integration
